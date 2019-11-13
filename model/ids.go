@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/gogo/protobuf/jsonpb"
 )
@@ -56,6 +57,9 @@ func (t TraceID) String() string {
 
 // TraceIDFromString creates a TraceID from a hexadecimal string
 func TraceIDFromString(s string) (TraceID, error) {
+	if strings.Contains(s, "-") {
+		s = strings.ReplaceAll(s, "-", "")
+	}
 	var hi, lo uint64
 	var err error
 	switch {
