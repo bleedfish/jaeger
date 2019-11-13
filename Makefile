@@ -214,6 +214,10 @@ build-agent:
 build-query:
 	CGO_ENABLED=0 installsuffix=cgo go build -tags ui -o ./cmd/query/query-$(GOOS) $(BUILD_INFO) ./cmd/query/main.go
 
+.PHONY: build-metrics
+build-metrics:
+	CGO_ENABLED=0 installsuffix=cgo go build -tags metrics -o ./cmd/metrics/metrics-$(GOOS) $(BUILD_INFO) ./cmd/metrics/main.go
+
 .PHONY: build-collector
 build-collector: elasticsearch-mappings
 	CGO_ENABLED=0 installsuffix=cgo go build -o ./cmd/collector/collector-$(GOOS) $(BUILD_INFO) ./cmd/collector/main.go
