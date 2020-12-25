@@ -18,6 +18,7 @@ package es
 import (
 	"flag"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -110,7 +111,8 @@ func (f *Factory) CreateSpanWriter() (spanstore.Writer, error) {
 
 // CreateDependencyReader implements storage.Factory
 func (f *Factory) CreateDependencyReader() (dependencystore.Reader, error) {
-	reader := esDepStore.NewDependencyStore(f.primaryClient, f.logger, f.primaryConfig.GetIndexPrefix())
+	reader := esDepStore.NewDependencyStore(f.primaryClient, f.logger, f.primaryConfig.GetIndexPrefix(),
+		f.primaryConfig.GetIndexDateLayout(), f.primaryConfig.GetMaxDocCount())
 	return reader, nil
 }
 
@@ -141,9 +143,10 @@ func createSpanReader(
 		Client:              client,
 		Logger:              logger,
 		MetricsFactory:      mFactory,
-		MaxNumSpans:         cfg.GetMaxNumSpans(),
+		MaxDocCount:         cfg.GetMaxDocCount(),
 		MaxSpanAge:          cfg.GetMaxSpanAge(),
 		IndexPrefix:         cfg.GetIndexPrefix(),
+		IndexDateLayout:     cfg.GetIndexDateLayout(),
 		TagDotReplacement:   cfg.GetTagDotReplacement(),
 		UseReadWriteAliases: cfg.GetUseReadWriteAliases(),
 		Archive:             archive,
@@ -158,12 +161,10 @@ func createSpanWriter(
 	archive bool,
 ) (spanstore.Writer, error) {
 	var tags []string
-	if cfg.GetTagsFilePath() != "" {
-		var err error
-		if tags, err = config.LoadTagsFromFile(cfg.GetTagsFilePath()); err != nil {
-			logger.Error("Could not open file with tags", zap.Error(err))
-			return nil, err
-		}
+	var err error
+	if tags, err = cfg.TagKeysAsFields(); err != nil {
+		logger.Error("failed to get tag keys", zap.Error(err))
+		return nil, err
 	}
 
 	spanMapping, serviceMapping := GetSpanServiceMappings(cfg.GetNumShards(), cfg.GetNumReplicas(), client.GetVersion())
@@ -172,6 +173,7 @@ func createSpanWriter(
 		Logger:              logger,
 		MetricsFactory:      mFactory,
 		IndexPrefix:         cfg.GetIndexPrefix(),
+		IndexDateLayout:     cfg.GetIndexDateLayout(),
 		AllTagsAsFields:     cfg.GetAllTagsAsFields(),
 		TagKeysAsFields:     tags,
 		TagDotReplacement:   cfg.GetTagDotReplacement(),
@@ -214,4 +216,14 @@ func fixMapping(mapping string, shards, replicas int64) string {
 	mapping = strings.Replace(mapping, "${__NUMBER_OF_SHARDS__}", strconv.FormatInt(shards, 10), 1)
 	mapping = strings.Replace(mapping, "${__NUMBER_OF_REPLICAS__}", strconv.FormatInt(replicas, 10), 1)
 	return mapping
+}
+
+var _ io.Closer = (*Factory)(nil)
+
+// Close closes the resources held by the factory
+func (f *Factory) Close() error {
+	if cfg := f.Options.Get(archiveNamespace); cfg != nil {
+		cfg.TLS.Close()
+	}
+	return f.Options.GetPrimary().TLS.Close()
 }

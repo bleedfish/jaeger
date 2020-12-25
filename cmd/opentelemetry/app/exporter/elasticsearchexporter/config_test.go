@@ -20,7 +20,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/collector/config"
+	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/config/configtest"
 
 	"github.com/jaegertracing/jaeger/cmd/flags"
 	jConfig "github.com/jaegertracing/jaeger/pkg/config"
@@ -43,11 +44,11 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestLoadConfigAndFlags(t *testing.T) {
-	factories, err := config.ExampleComponents()
+	factories, err := componenttest.ExampleComponents()
 	require.NoError(t, err)
 
 	v, c := jConfig.Viperize(DefaultOptions().AddFlags, flags.AddConfigFileFlag)
-	err = c.ParseFlags([]string{"--es.server-urls=bar", "--es.index-prefix=staging", "--config-file=./testdata/jaeger-config.yaml"})
+	err = c.ParseFlags([]string{"--es.server-urls=bar", "--es.index-prefix=staging", "--es.index-date-separator=-", "--config-file=./testdata/jaeger-config.yaml"})
 	require.NoError(t, err)
 
 	err = flags.TryLoadConfigFile(v)
@@ -63,7 +64,7 @@ func TestLoadConfigAndFlags(t *testing.T) {
 	}}
 
 	factories.Exporters[TypeStr] = factory
-	colConfig, err := config.LoadConfigFile(t, path.Join(".", "testdata", "config.yaml"), factories)
+	colConfig, err := configtest.LoadConfigFile(t, path.Join(".", "testdata", "config.yaml"), factories)
 	require.NoError(t, err)
 	require.NotNil(t, colConfig)
 
@@ -73,6 +74,7 @@ func TestLoadConfigAndFlags(t *testing.T) {
 	assert.Equal(t, []string{"someUrl"}, esCfg.Servers)
 	assert.Equal(t, true, esCfg.CreateIndexTemplates)
 	assert.Equal(t, "staging", esCfg.IndexPrefix)
+	assert.Equal(t, "2006-01-02", esCfg.IndexDateLayout)
 	assert.Equal(t, int64(100), esCfg.NumShards)
 	assert.Equal(t, "user", esCfg.Username)
 	assert.Equal(t, "pass", esCfg.Password)

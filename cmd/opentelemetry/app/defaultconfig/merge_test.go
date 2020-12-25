@@ -21,14 +21,15 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config"
 	"go.opentelemetry.io/collector/config/configgrpc"
 	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/config/configmodels"
 	"go.opentelemetry.io/collector/config/confignet"
-	"go.opentelemetry.io/collector/config/configprotocol"
 	"go.opentelemetry.io/collector/processor/attributesprocessor"
 	"go.opentelemetry.io/collector/processor/batchprocessor"
+	"go.opentelemetry.io/collector/processor/processorhelper"
 	"go.opentelemetry.io/collector/receiver/jaegerreceiver"
 	"go.opentelemetry.io/collector/receiver/zipkinreceiver"
 
@@ -60,8 +61,14 @@ func TestMergeConfigs(t *testing.T) {
 							Endpoint: "def",
 						},
 					},
-					ThriftCompact: &configprotocol.ProtocolServerSettings{
+					ThriftCompact: &jaegerreceiver.ProtocolUDP{
 						Endpoint: "def",
+						ServerConfigUDP: jaegerreceiver.ServerConfigUDP{
+							QueueSize:        100,
+							MaxPacketSize:    65_536,
+							Workers:          10,
+							SocketBufferSize: 65_536,
+						},
 					},
 				},
 			},
@@ -100,7 +107,9 @@ func TestMergeConfigs(t *testing.T) {
 		},
 		Processors: configmodels.Processors{
 			"attributes": &attributesprocessor.Config{
-				Actions: []attributesprocessor.ActionKeyValue{{Key: "foo"}},
+				Settings: processorhelper.Settings{
+					Actions: []processorhelper.ActionKeyValue{{Key: "foo"}},
+				},
 			},
 		},
 		Service: configmodels.Service{
@@ -125,8 +134,14 @@ func TestMergeConfigs(t *testing.T) {
 							Endpoint: "master_jaeger_url",
 						},
 					},
-					ThriftCompact: &configprotocol.ProtocolServerSettings{
+					ThriftCompact: &jaegerreceiver.ProtocolUDP{
 						Endpoint: "def",
+						ServerConfigUDP: jaegerreceiver.ServerConfigUDP{
+							QueueSize:        100,
+							MaxPacketSize:    65_536,
+							Workers:          10,
+							SocketBufferSize: 65_536,
+						},
 					},
 				},
 			},
@@ -141,7 +156,9 @@ func TestMergeConfigs(t *testing.T) {
 				SendBatchSize: uint32(160),
 			},
 			"attributes": &attributesprocessor.Config{
-				Actions: []attributesprocessor.ActionKeyValue{{Key: "foo"}},
+				Settings: processorhelper.Settings{
+					Actions: []processorhelper.ActionKeyValue{{Key: "foo"}},
+				},
 			},
 		},
 		Service: configmodels.Service{
@@ -181,7 +198,7 @@ func TestMergeConfigFiles(t *testing.T) {
 	}
 }
 
-func loadConfig(factories config.Factories, file string) (*configmodels.Config, error) {
+func loadConfig(factories component.Factories, file string) (*configmodels.Config, error) {
 	v := viper.New()
 	v.SetConfigFile(file)
 	err := v.ReadInConfig()
